@@ -18,7 +18,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.calibration import CalibratedClassifierCV
 import xgboost as xgb
-import catboost as cb
+try:
+    import catboost as cb
+except ImportError:
+    cb = None
 from lifelines import CoxPHFitter
 from lifelines.utils import concordance_index
 from sksurv.ensemble import RandomSurvivalForest
@@ -477,6 +480,10 @@ class CatBoostSnapshotBaseline(BaselineModel):
             name: Model name
             seed: Random seed
         """
+        if cb is None:
+            raise ImportError(
+                "catboost is not installed. Install with: pip install catboost"
+            )
         super().__init__(name=name, seed=seed)
         self.depth = depth
         self.learning_rate = learning_rate

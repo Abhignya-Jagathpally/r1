@@ -376,8 +376,23 @@ def bone_baselines(
         drop_cols = [c for c in endpoint_cols + id_cols if c in train_df.columns]
         feature_cols = [c for c in train_df.columns if c not in drop_cols]
 
-        X_train = train_df[feature_cols].values
-        X_val = val_df[feature_cols].values
+        # Encode categoricals and drop non-numeric columns
+        # Identify object/string columns among features
+        cat_cols = [c for c in feature_cols if train_df[c].dtype == object]
+        if cat_cols:
+            logger.info(f"  One-hot encoding {len(cat_cols)} categorical columns: {cat_cols}")
+            train_encoded = pd.get_dummies(train_df[feature_cols], columns=cat_cols, drop_first=True)
+            val_encoded = pd.get_dummies(val_df[feature_cols], columns=cat_cols, drop_first=True)
+            # Align columns (val may have missing dummy cols)
+            train_encoded, val_encoded = train_encoded.align(val_encoded, join="left", axis=1, fill_value=0)
+            feature_cols = train_encoded.columns.tolist()
+        else:
+            train_encoded = train_df[feature_cols]
+            val_encoded = val_df[feature_cols]
+
+        # Fill remaining NaN with 0 for model input
+        X_train = train_encoded.fillna(0).values.astype(float)
+        X_val = val_encoded.fillna(0).values.astype(float)
 
         # Primary endpoint: PFS event within observation window
         y_train = {
@@ -529,12 +544,10 @@ def _train_deephit(
 
     n_features = len(feature_cols)
     config = DeepHitConfig(
-        input_dim=n_features,
-        hidden_dim=128,
-        n_causes=3,          # progression, death, relapse
-        n_time_bins=50,
-        lstm_layers=2,
-        dropout=0.3,
+        num_features=n_features,
+        lstm_hidden_dim=128,
+        num_causes=3,          # progression, death, relapse
+        num_time_steps=50,
     )
     model = DeepHit(config)
 
@@ -574,13 +587,13 @@ def _train_tft(
 
     n_features = len(feature_cols)
     config = TFTConfig(
-        n_numeric_features=n_features,
-        n_categorical_features=0,
-        hidden_dim=128,
-        n_heads=4,
-        n_layers=2,
-        dropout=0.2,
-        forecast_horizon=3,
+        num_features=n_features,
+        num_static_features=0,
+        lstm_hidden_dim=128,
+        num_attention_heads=4,
+        num_transformer_layers=2,
+        dropout=0.1,
+        prediction_horizons=(3, 6, 12),
     )
     model = TemporalFusionTransformer(config)
 
@@ -625,10 +638,25 @@ def bone_evaluate(
         ]
         id_cols = ["patient_id", "visit_id", "timepoint"]
         drop_cols = [c for c in endpoint_cols + id_cols if c in test_df.columns]
-        if not feature_cols:
-            feature_cols = [c for c in test_df.columns if c not in drop_cols]
 
-        X_test = test_df[feature_cols].values
+        # Identify raw feature columns from test_df (before encoding)
+        raw_feature_cols = [c for c in test_df.columns if c not in drop_cols]
+
+        # Encode categoricals on test_df same as baselines did on train
+        cat_cols = [c for c in raw_feature_cols if test_df[c].dtype == object]
+        if cat_cols:
+            test_encoded = pd.get_dummies(test_df[raw_feature_cols], columns=cat_cols, drop_first=True)
+        else:
+            test_encoded = test_df[raw_feature_cols].copy()
+
+        # Align with training feature columns if available
+        if feature_cols:
+            for fc in feature_cols:
+                if fc not in test_encoded.columns:
+                    test_encoded[fc] = 0
+            test_encoded = test_encoded[feature_cols]
+
+        X_test = test_encoded.fillna(0).values.astype(float)
         y_test_event = test_df["pfs_event"].values if "pfs_event" in test_df.columns else np.zeros(len(test_df))
         y_test_time = test_df["pfs_time"].values if "pfs_time" in test_df.columns else np.zeros(len(test_df))
 

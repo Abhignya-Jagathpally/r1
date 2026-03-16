@@ -238,15 +238,50 @@ class CoMMpassIngester:
 
         return endpoints
 
+    # CoMMpass-specific column name mappings
+    COMMPASS_COLUMN_MAP = {
+        # Endpoints
+        "ttcpfs": "pfs_days",
+        "censpfs": "pfs_event",
+        "ttcos": "os_days",
+        "censos": "os_event",
+        # Demographics / staging from PER_PATIENT
+        "D_PT_age": "age_at_diagnosis",
+        "D_PT_gender": "gender",
+        "D_PT_race": "race",
+        "D_PT_iss": "iss_stage",
+        "D_PT_riss": "r_iss_stage",
+        "D_PT_del17p": "fish_del17p",
+        "D_PT_t_4_14": "fish_t_4_14",
+        "D_PT_t_14_16": "fish_t_14_16",
+        "D_PT_gain1q": "fish_gain1q",
+        "D_PT_del13": "fish_del13",
+        "D_PT_high_risk": "high_risk",
+        "D_PT_transplant": "prior_transplant",
+        "D_PT_treatment_lines": "treatment_line",
+        # Labs from PER_PATIENT_VISIT
+        "D_LAB_serum_m_protein": "serum_m_protein_g_dl",
+        "D_LAB_serum_flc_kappa": "free_light_chain_kappa_mg_l",
+        "D_LAB_serum_flc_lambda": "free_light_chain_lambda_mg_l",
+        "D_LAB_cbc_hemoglobin": "hemoglobin_g_dl",
+        "D_LAB_chem_calcium": "calcium_mg_dl",
+        "D_LAB_chem_creatinine": "creatinine_mg_dl",
+        "D_LAB_chem_albumin": "albumin_g_dl",
+        "D_LAB_chem_beta2_microglobulin": "beta2_microglobulin_mg_l",
+        "D_LAB_chem_ldh": "ldh_u_l",
+        # Visit structure
+        "PUBLIC_ID": "patient_id",
+        "VISIT": "visit_id",
+        "VISITDY": "timepoint",
+    }
+
     def ingest(self) -> pd.DataFrame:
         """
         Load, parse, and consolidate CoMMpass data into unified format.
 
-        Process:
-            1. Load all CSV/TSV files
-            2. Identify patient and visit identifiers
-            3. Extract lab, treatment, genetic, and endpoint variables
-            4. Consolidate into single DataFrame
+        Strategy: use PER_PATIENT_VISIT as the longitudinal backbone,
+        then merge in patient-level demographics, genetics, and endpoints
+        from PER_PATIENT and SURVIVAL files.
 
         Returns:
             DataFrame with columns:
@@ -256,52 +291,104 @@ class CoMMpassIngester:
                 - All genetic/staging vars (GENETIC_COLUMNS keys)
                 - All endpoints (ENDPOINT_COLUMNS keys)
                 - _source: originating filename
-
-        Raises:
-            ValueError: If patient_id or visit structure cannot be inferred
         """
         raw_files = self.load_raw_files()
 
-        # Look for main clinical data file (heuristic: largest file or matches pattern)
-        main_dfs = [
-            (name, df) for name, df in raw_files.items()
-            if any(pat in name.lower() for pat in ["clinical", "baseline", "patient", "main"])
-        ]
+        # ── Identify the visit-level and patient-level files ──
+        visit_df = None
+        patient_df = None
+        survival_df = None
 
-        if not main_dfs:
-            main_dfs = sorted(raw_files.items(), key=lambda x: x[1].shape[0], reverse=True)[:1]
+        for name, df in raw_files.items():
+            name_lower = name.lower()
+            if "per_patient_visit" in name_lower or "visit" in name_lower:
+                visit_df = df
+                logger.info(f"Using {name} as visit-level longitudinal backbone")
+            elif "survival" in name_lower:
+                survival_df = df
+                logger.info(f"Using {name} as survival endpoints source")
+            elif "per_patient" in name_lower or "patient" in name_lower:
+                patient_df = df
+                logger.info(f"Using {name} as patient-level baseline source")
 
-        if not main_dfs:
-            raise ValueError("No suitable clinical data file found")
+        # Fall back: if no visit file, use the largest as main
+        if visit_df is None:
+            biggest = max(raw_files.items(), key=lambda x: x[1].shape[0])
+            visit_df = biggest[1]
+            logger.info(f"Fallback: using {biggest[0]} as main source")
 
-        source_name, main_df = main_dfs[0]
-        logger.info(f"Using {source_name} as primary clinical data source")
+        # ── Rename columns using CoMMpass mapping ──
+        visit_df = visit_df.rename(columns=self.COMMPASS_COLUMN_MAP)
 
-        # Infer patient and visit IDs
-        patient_col = self._infer_patient_column(main_df)
-        visit_col = self._infer_visit_column(main_df)
-        timepoint_col = self._infer_timepoint_column(main_df)
+        # ── Merge patient-level data if available ──
+        if patient_df is not None:
+            patient_df = patient_df.rename(columns=self.COMMPASS_COLUMN_MAP)
+            # Only merge columns not already in visit_df (except patient_id)
+            merge_cols = ["patient_id"] + [
+                c for c in patient_df.columns
+                if c not in visit_df.columns and c != "patient_id"
+            ]
+            merge_cols = [c for c in merge_cols if c in patient_df.columns]
+            visit_df = visit_df.merge(
+                patient_df[merge_cols], on="patient_id", how="left",
+            )
+            logger.info(f"Merged patient-level data: added {len(merge_cols)-1} columns")
 
-        if not patient_col:
-            raise ValueError("Cannot infer patient_id column")
+        # ── Merge survival endpoints if available and not already present ──
+        if survival_df is not None:
+            survival_df = survival_df.rename(columns=self.COMMPASS_COLUMN_MAP)
+            surv_cols = ["patient_id"] + [
+                c for c in survival_df.columns
+                if c not in visit_df.columns and c != "patient_id"
+            ]
+            surv_cols = [c for c in surv_cols if c in survival_df.columns]
+            if len(surv_cols) > 1:  # more than just patient_id
+                visit_df = visit_df.merge(
+                    survival_df[surv_cols], on="patient_id", how="left",
+                )
+                logger.info(f"Merged survival endpoints: added {len(surv_cols)-1} columns")
 
-        result = pd.DataFrame({
-            "patient_id": main_df[patient_col],
-            "visit_id": main_df[visit_col] if visit_col else range(len(main_df)),
-            "timepoint": main_df[timepoint_col] if timepoint_col else 0,
-        })
+        # ── Ensure all expected columns exist ──
+        for std_col in list(self.LAB_COLUMNS.keys()):
+            if std_col not in visit_df.columns:
+                visit_df[std_col] = np.nan
+        for std_col in list(self.ENDPOINT_COLUMNS.keys()):
+            if std_col not in visit_df.columns:
+                visit_df[std_col] = np.nan
 
-        # Extract all feature groups
-        labs = self._extract_labs(main_df)
-        treatment = self._extract_treatment(main_df)
-        genetics = self._extract_genetics_staging(main_df)
-        endpoints = self._extract_endpoints(main_df)
+        # ── Ensure critical endpoint columns are numeric ──
+        for col in ["pfs_days", "pfs_event", "os_days", "os_event",
+                     "time_to_progression_days", "ttp_event", "relapse_event"]:
+            if col in visit_df.columns:
+                visit_df[col] = pd.to_numeric(visit_df[col], errors="coerce")
+        # Fill event columns with 0 where NaN (censored)
+        for col in ["pfs_event", "os_event", "ttp_event", "relapse_event"]:
+            if col in visit_df.columns:
+                visit_df[col] = visit_df[col].fillna(0).astype(int)
 
-        result = pd.concat([result, labs, treatment, genetics, endpoints], axis=1)
-        result["_source"] = source_name
+        # ── Ensure patient_id, visit_id, timepoint exist ──
+        if "patient_id" not in visit_df.columns:
+            patient_col = self._infer_patient_column(visit_df)
+            if patient_col:
+                visit_df = visit_df.rename(columns={patient_col: "patient_id"})
+            else:
+                raise ValueError("Cannot infer patient_id column")
+        if "visit_id" not in visit_df.columns:
+            visit_col = self._infer_visit_column(visit_df)
+            if visit_col:
+                visit_df = visit_df.rename(columns={visit_col: "visit_id"})
+            else:
+                visit_df["visit_id"] = range(len(visit_df))
+        if "timepoint" not in visit_df.columns:
+            tp_col = self._infer_timepoint_column(visit_df)
+            if tp_col:
+                visit_df = visit_df.rename(columns={tp_col: "timepoint"})
+            else:
+                visit_df["timepoint"] = 0
 
-        logger.info(f"Ingested {result.shape[0]} records with {result.shape[1]} features")
-        return result.reset_index(drop=True)
+        visit_df["_source"] = "merged_compass"
+        logger.info(f"Ingested {visit_df.shape[0]} records with {visit_df.shape[1]} features")
+        return visit_df.reset_index(drop=True)
 
     @staticmethod
     def _infer_patient_column(df: pd.DataFrame) -> Optional[str]:
