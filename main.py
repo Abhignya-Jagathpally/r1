@@ -214,7 +214,7 @@ def bone_cleanse(
             cleaned_df, mask = cleaner.apply(raw_df)
             # Save frozen preprocessing state
             state = cleaner.get_state()
-            state_path = Path(settings.output_dir) / "preprocessing_state.json"
+            state_path = Path(settings.output_dir) / "preprocessing_state.pkl"
             state.save(str(state_path))
             ckpt.artifacts.append(str(state_path))
             ckpt.parameters["preprocessing_version"] = state.version
@@ -984,18 +984,23 @@ def bone_evaluate(
         y_test_event = test_df["pfs_event"].values if "pfs_event" in test_df.columns else np.zeros(len(test_df))
         y_test_time = test_df["pfs_days"].values if "pfs_days" in test_df.columns else np.zeros(len(test_df))
  
+        # Convert times from days to months for horizon comparison
+        y_test_time_months = y_test_time / 30.44
+
         eval_results = {}
         for model_name, model in trained_baselines.items():
             logger.info(f"Evaluating {model_name} on held-out test set...")
+            logger.info("Evaluating as snapshot classification task (binary event prediction)")
             try:
                 y_pred = np.clip(model.predict(X_test), 0, 1)
                 result = evaluator.evaluate_model(
                     y_true=y_test_event,
                     y_pred=y_pred,
-                    times=y_test_time,
+                    times=y_test_time_months,
                     events=y_test_event,
                     time_horizons=settings.eval_horizons_months,
                     model_name=model_name,
+                    task_type="snapshot_classification",
                 )
                 eval_results[model_name] = result
             except Exception as e:

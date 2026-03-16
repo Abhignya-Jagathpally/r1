@@ -3,7 +3,7 @@ Data Provisioning — Download CoMMpass clinical data.
 
 Strategy:
   1. Try MMRF AWS Open Data (flat files — requires auth in practice)
-  2. Fall back to GDC API (public, no auth, real MMRF-COMMPASS case data)
+  2. Fall back to GDC Cases API (open metadata only — demographics, vital status, diagnosis). Lab values and longitudinal data require MMRF Researcher Gateway.
 """
 
 import logging
@@ -52,7 +52,7 @@ def provision_data(data_dir: Path, method: str = "curl") -> bool:
     if _try_mmrf_aws(data_dir, method):
         return True
 
-    # Strategy 2: Fall back to GDC (always available, no auth)
+    # Strategy 2: GDC Cases API (open metadata, no molecular/lab data)
     logger.info("MMRF AWS not accessible. Falling back to GDC API (public)...")
     return _try_gdc_download(data_dir)
 
@@ -93,7 +93,7 @@ def _try_mmrf_aws(data_dir: Path, method: str) -> bool:
 
 
 def _try_gdc_download(data_dir: Path) -> bool:
-    """Download clinical data from GDC API (always public)."""
+    """Download case metadata from GDC API (open access, limited to demographics and survival endpoints)."""
     try:
         from src.shared.utils.gdc_download import download_commpass_from_gdc
         path = download_commpass_from_gdc(data_dir)
@@ -112,8 +112,10 @@ def print_data_instructions(data_dir: Path) -> None:
     print()
     print(f"The pipeline needs CoMMpass clinical flat files in: {data_dir}/")
     print()
-    print("Option 1 — Run with GDC data (automatic):")
+    print("Option 1 — GDC case metadata only (automatic, limited features):")
     print("  python main.py --provision-data")
+    print("  WARNING: GDC provides demographics and survival endpoints only.")
+    print("  For full pipeline capability (lab values, treatment data), use Option 2 or 3.")
     print()
     print("Option 2 — Manual download from MMRF:")
     print("  1. Visit https://research.themmrf.org/")

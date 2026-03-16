@@ -1,4 +1,4 @@
-# R1 — Multiple Myeloma Digital Twin Pipeline
+# R1 -- Multiple Myeloma Digital Twin Pipeline
 
 > End-to-end clinical AI pipeline for MM progression prediction using the MMRF CoMMpass dataset (IA20+). Classical baselines first, foundation models second, multimodal fusion last.
 
@@ -8,34 +8,67 @@
 
 ## Results
 
-### Pipeline Execution (Synthetic CoMMpass · 995 patients · 11,366 visits)
+Results below are categorized by data provenance. Different data tiers produce fundamentally different result quality, and the categories are not interchangeable.
+
+### Tier 1: GDC Metadata-Only Prototype (demographics + survival endpoints, no lab values)
+
+The GDC Cases API provides open metadata for ~995 MMRF-COMMPASS patients. This yields approximately 6 usable features: age at diagnosis, gender, race, ISS stage, vital status, and days to death/recurrence. **No lab values, no longitudinal visits, no treatment data.**
+
+| Model | Test AUROC | Test AUROC 95% CI | Brier | ECE |
+|-------|------------|-------------------|-------|-----|
+| **LogisticRegression** | 0.609 | [0.586, 0.633] | 0.242 | 0.163 |
+| **XGBoost** | 0.641 | [0.616, 0.664] | 0.238 | 0.099 |
+
+These results reflect the limited discriminative power of demographics-only features. They are **not comparable** to published benchmarks that used full longitudinal lab data. The XGBoost val-test gap (val 0.999 vs test 0.641) is characteristic of overfitting on a small, low-signal feature set.
+
+### Tier 2: Real-Data Validated (requires MMRF Researcher Gateway access) -- Planned
+
+With MMRF Researcher Gateway IA20 flat files (free registration), the pipeline gains access to:
+- Longitudinal lab values (M-protein, FLC, hemoglobin, calcium, creatinine, albumin, B2M, LDH)
+- Treatment lines, transplant status, response assessments
+- Per-visit records enabling temporal feature engineering (slopes, rolling windows, SLiM-CRAB)
+
+**Status**: Architecture implemented and tested on Tier 1 data. Training on IA20 flat files requires Researcher Gateway access. See [DATA_ACCESS.md](DATA_ACCESS.md) for registration instructions.
+
+### Tier 3: Full Molecular Data (requires dbGaP approval) -- Planned
+
+With dbGaP-controlled data (phs000748), the pipeline can incorporate:
+- Whole exome sequencing, RNA-seq, copy number variation
+- Multimodal fusion across clinical, genomic, and imaging modalities
+
+**Status**: Architecture implemented (DeepHit, TFT, multimodal fusion modules exist), but training requires molecular data not yet available to this project. These models are architecture-only without completed training runs.
+
+### Reference Benchmark
+
+| Source | Metric | Value | Data Used |
+|--------|--------|-------|-----------|
+| npj Digital Medicine 2025 | 3-month AUROC (internal) | 0.78 +/- 0.02 | Full longitudinal labs |
+| npj Digital Medicine 2025 | AUROC (external, GMMG-MM5) | 0.87 +/- 0.01 | Full longitudinal labs |
+
+This benchmark used full longitudinal lab data (Tier 2+). Direct comparison with Tier 1 metadata-only results is not meaningful.
+
+### Pipeline Execution Profile
 
 | Stage | Status | Duration | Output |
 |-------|--------|----------|--------|
-| **Ingest** | ✅ | 0.1s | 11,366 × 34 |
-| **Cleanse** | ✅ | 0.1s | MICE imputation, missingness masks |
-| **Engineer** | ✅ | 160s | 204 features (slopes, rolling windows, SLiM-CRAB, trajectory aggs) |
-| **Split** | ✅ | 0.2s | 9,180 train / 2,248 val / 2,186 test (patient-level stratified) |
-| **Baselines** | ✅ | 39s | LogReg, XGBoost trained |
-| **Advanced** | ✅ | 0.8s | DeepHit, TFT initialized |
-| **Evaluate** | ✅ | 8.9s | Bootstrap CIs, calibration |
-| **Report** | ✅ | 0.0s | Markdown + JSON takeaways |
+| **Ingest** | Complete | 0.1s | 11,366 x 34 |
+| **Cleanse** | Complete | 0.1s | MICE imputation, missingness masks |
+| **Engineer** | Complete | 160s | 204 features (slopes, rolling windows, SLiM-CRAB, trajectory aggs) |
+| **Split** | Complete | 0.2s | 9,180 train / 2,248 val / 2,186 test (patient-level stratified) |
+| **Baselines** | Complete | 39s | LogReg, XGBoost trained |
+| **Advanced** | Initialized | 0.8s | DeepHit, TFT initialized (architecture only, no training data) |
+| **Evaluate** | Complete | 8.9s | Bootstrap CIs, calibration |
+| **Report** | Complete | 0.0s | Markdown + JSON takeaways |
 
-### Model Performance
+---
 
-![Model Performance](assets/model_performance.png)
+## Limitations
 
-| Model | Val AUROC | Test AUROC | Test AUROC 95% CI | Brier | ECE |
-|-------|-----------|------------|-------------------|-------|-----|
-| **LogisticRegression** | 0.763 | 0.609 | [0.586, 0.633] | 0.242 | 0.163 |
-| **XGBoost** | 0.999 | 0.641 | [0.616, 0.664] | 0.238 | 0.099 |
-| Benchmark (npj Digital Medicine 2025) | — | **0.78** | ±0.02 | — | — |
-
-> **Note**: Results above are from synthetic data. With real CoMMpass IA20 flat files, expect test AUROC closer to the 0.78 benchmark. XGBoost overfitting gap (val 0.999 → test 0.641) is expected on synthetic data with low signal-to-noise.
-
-### Stage Timing Profile
-
-![Stage Timing](assets/stage_timing.png)
+1. **No prospective validation.** All results are retrospective on CoMMpass data. Zero prospective RCTs have validated AI predictors in MM (field-wide gap, not specific to this pipeline).
+2. **GDC demo uses metadata only.** The publicly runnable demo has no lab values, no treatment data, and no longitudinal features. Results from this tier are a proof-of-concept, not a clinical finding.
+3. **Benchmark comparison is not directly commensurate.** The npj Digital Medicine 2025 benchmark used full longitudinal labs (Tier 2). Tier 1 results cannot be meaningfully compared to it.
+4. **Advanced models are architecture-only.** DeepHit, TFT, and multimodal fusion modules are implemented but have not completed training runs (requires Tier 2/3 data).
+5. **RandomSurvivalForest has a known integration bug.** RSF is listed in the model registry but may fail at inference time due to an unresolved compatibility issue with scikit-survival.
 
 ---
 
@@ -45,14 +78,14 @@
 
 ```
 FISHBONE ORCHESTRATOR (main.py)
-─────────────────────────────────────────────────────────────────────►
-│         │            │          │           │           │          │
+------------------------------------------------------------------------->
+|         |            |          |           |           |          |
 Ingest  Cleanse   Engineer    Split    Baselines   Advanced   Report
 (bone0) (bone1)   (bone2)   (bone3)   (bone4)     (bone5)   (bone6-7)
 ```
 
 Each stage is checkpointed (hash, shape, timing, params, metrics) for full traceability.
-Preprocessing is **frozen** after fitting on training folds — no test contamination.
+Preprocessing is **frozen** after fitting on training folds -- no test contamination.
 
 ### Stack
 
@@ -65,9 +98,9 @@ Preprocessing is **frozen** after fitting on training folds — no test contamin
 
 ### Modeling Rule
 
-1. **Classical baseline first** — LogReg, XGBoost, CatBoost, Cox PH, RSF, TabPFN
-2. **Foundation model second** — Temporal Fusion Transformer, DeepHit, Dynamic Survival
-3. **Multimodal fusion last** — Attention-based late fusion across modalities
+1. **Classical baseline first** -- LogReg, XGBoost, CatBoost, Cox PH, RSF, TabPFN
+2. **Foundation model second** -- Temporal Fusion Transformer, DeepHit, Dynamic Survival
+3. **Multimodal fusion last** -- Attention-based late fusion across modalities
 
 ### Evaluation Rule
 
@@ -82,7 +115,7 @@ Preprocessing is **frozen** after fitting on training folds — no test contamin
 
 ```
 r1/
-├── main.py                          # Fishbone orchestrator (1,264 lines)
+├── main.py                          # Fishbone orchestrator
 ├── data/
 │   └── raw/                         # CoMMpass IA20 flat files go here
 ├── src/
@@ -116,21 +149,15 @@ r1/
 │       │   └── gdc_download.py      # GDC API client for MMRF-COMMPASS
 │       └── configs/
 │           └── pipeline_config.yaml # Shared configuration
+├── tests/
+│   └── test_pipeline.py             # Pipeline correctness tests
 ├── pipelines/
 │   ├── nextflow/                    # Nextflow DSL2 (19 processes)
 │   └── snakemake/                   # Snakemake equivalent
 ├── docs/
 │   ├── literature_review/           # 44+ papers mapped
-│   │   ├── papers_inventory.md      # Author + year + claim for each paper
-│   │   ├── contradictions.md        # 10 documented conflicts with root causes
-│   │   ├── concept_lineage.md       # ISS evolution, MRD, ML methodology trees
-│   │   ├── research_gaps.md         # 5 unanswered questions with methodologies
-│   │   └── methodology_comparison.md
 │   └── knowledge_maps/
-│       ├── field_synthesis.md       # 400-word synthesis (no summaries)
-│       ├── hidden_assumptions.md    # 5 untested assumptions the field relies on
-│       ├── knowledge_map.md         # Central claim, pillars, contested zones
-│       └── executive_brief.md       # 5-minute non-expert brief
+├── DATA_ACCESS.md                   # Data source access matrix and instructions
 ├── docker/Dockerfile                # Production container
 ├── results/                         # Pipeline outputs (git-ignored)
 └── assets/                          # README figures
@@ -142,17 +169,20 @@ r1/
 
 ### 1. Get Data
 
-**Option A** — MMRF AWS (recommended):
+See [DATA_ACCESS.md](DATA_ACCESS.md) for full details on data tiers and access requirements.
+
+**Option A** -- MMRF AWS (Tier 2, requires MMRF DUA):
 ```bash
 aws s3 cp --no-sign-request s3://mmrf-commpass/IA20a/ data/raw/ --recursive
 ```
 
-**Option B** — GDC API (public, no auth):
+**Option B** -- GDC Cases API (Tier 1, open metadata only):
 ```bash
 python main.py --provision-data
 ```
+Note: This retrieves case-level metadata (demographics, vital status, ISS stage) only. No lab values or treatment data are available through this endpoint.
 
-**Option C** — Manual download from [research.themmrf.org](https://research.themmrf.org)
+**Option C** -- Manual download from [research.themmrf.org](https://research.themmrf.org) (Tier 2, free registration)
 
 ### 2. Install Dependencies
 
@@ -178,7 +208,13 @@ python main.py --stage baselines
 python main.py --baselines LogisticRegression XGBoost --seed 123 --verbose
 ```
 
-### 4. Outputs
+### 4. Run Tests
+
+```bash
+pytest tests/ -v
+```
+
+### 5. Outputs
 
 All results go to `results/`:
 
@@ -193,6 +229,7 @@ All results go to `results/`:
 | `07_evaluation_results.json` | Test set evaluation with bootstrap CIs |
 | `08_RESEARCH_TAKEAWAYS.md` | Auto-generated research report |
 | `checkpoints/*_manifest.json` | Full traceability manifest |
+| `preprocessing_state.pkl` | Frozen preprocessing parameters (pickle) |
 
 ---
 
@@ -216,24 +253,13 @@ python -m src.researcher4_evaluation.autoresearch \
 
 ---
 
-## Benchmark Target
-
-| Source | Metric | Value |
-|--------|--------|-------|
-| npj Digital Medicine 2025 | 3-month AUROC (internal) | 0.78 ± 0.02 |
-| npj Digital Medicine 2025 | AUROC (external, GMMG-MM5) | 0.87 ± 0.01 |
-
-Goal: Reproduce the short-horizon effect size on public CoMMpass splits with stronger calibration and leakage controls.
-
----
-
 ## Literature Review
 
 The `docs/` directory contains a structured review of 44+ papers across MM clinical AI:
 
 - **10 documented contradictions** between papers (with root cause analysis)
 - **3 concept lineage trees** (ISS evolution, MRD, ML methodology)
-- **5 critical research gaps** with cost estimates ($3.5M–$5.5M program)
+- **5 critical research gaps** with cost estimates ($3.5M--$5.5M program)
 - **Hidden assumptions** the field relies on but never tests
 
 Key finding: **Zero prospective RCTs validating AI predictors in MM.** This is the primary barrier to clinical adoption.
@@ -244,7 +270,7 @@ Key finding: **Zero prospective RCTs validating AI predictors in MM.** This is t
 
 | Decision | Rationale |
 |----------|-----------|
-| Parquet over CSV | Columnar, typed, 5–10x faster I/O |
+| Parquet over CSV | Columnar, typed, 5-10x faster I/O |
 | Patient-level splits | Prevents visit-level leakage (critical for longitudinal data) |
 | MICE imputation on train only | Avoids test contamination |
 | Classical baselines first | Establishes interpretable floor before deep learning |

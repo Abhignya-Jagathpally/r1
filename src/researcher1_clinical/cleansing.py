@@ -16,6 +16,7 @@ Contract:
 """
 
 import logging
+import pickle
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
@@ -31,26 +32,50 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WinsorizeConfig:
     """
-    Clinician-reviewed bounds for winsorization.
+    Instrument-error bounds for winsorization.
 
-    Bounds prevent unrealistic lab values from skewing downstream modeling.
-    All bounds are parameterizable for clinical validation.
+    Bounds are set at instrument-error thresholds only. Disease-defining
+    biomarkers (FLC, M-protein) are NOT winsorized because extreme values
+    carry diagnostic and prognostic meaning in MM. For example, FLC kappa
+    >1000 mg/L, FLC ratio >100, and serum M-protein >10 g/dL are expected
+    in active myeloma and must be preserved for accurate modeling.
+
+    Remaining labs use physically-impossible instrument-error ceilings,
+    NOT clinical normal ranges, to avoid destroying disease signal.
     """
-    serum_m_protein_bounds: Tuple[float, float] = (0.0, 10.0)  # g/dL
-    flc_kappa_bounds: Tuple[float, float] = (0.33, 19.4)  # mg/L
-    flc_lambda_bounds: Tuple[float, float] = (0.27, 26.3)  # mg/L
-    flc_ratio_bounds: Tuple[float, float] = (0.26, 1.65)
-    hemoglobin_bounds: Tuple[float, float] = (5.0, 18.0)  # g/dL
-    calcium_bounds: Tuple[float, float] = (6.0, 14.0)  # mg/dL
-    creatinine_bounds: Tuple[float, float] = (0.3, 10.0)  # mg/dL
-    albumin_bounds: Tuple[float, float] = (1.0, 5.5)  # g/dL
-    beta2_microglobulin_bounds: Tuple[float, float] = (0.5, 50.0)  # mg/L
-    ldh_bounds: Tuple[float, float] = (100, 2000)  # U/L
+    # Disease-defining biomarkers: no winsorization (None = skip)
+    serum_m_protein_bounds: Optional[Tuple[float, float]] = None
+    flc_kappa_bounds: Optional[Tuple[float, float]] = None
+    flc_lambda_bounds: Optional[Tuple[float, float]] = None
+    flc_ratio_bounds: Optional[Tuple[float, float]] = None
+    # Remaining labs: instrument-error bounds only
+    hemoglobin_bounds: Tuple[float, float] = (0.0, 25.0)  # g/dL — instrument max
+    calcium_bounds: Tuple[float, float] = (0.0, 30.0)  # mg/dL — instrument error only
+    creatinine_bounds: Tuple[float, float] = (0.0, 30.0)  # mg/dL — instrument error only
+    albumin_bounds: Tuple[float, float] = (0.0, 7.0)  # g/dL — instrument error only
+    beta2_microglobulin_bounds: Tuple[float, float] = (0.0, 200.0)  # mg/L — instrument error only
+    ldh_bounds: Tuple[float, float] = (0, 10000)  # U/L — instrument error only
+
+    # Map from LAB_COLUMNS names to config attribute prefixes
+    _COL_TO_ATTR = {
+        "serum_m_protein_g_dl": "serum_m_protein",
+        "free_light_chain_kappa_mg_l": "flc_kappa",
+        "free_light_chain_lambda_mg_l": "flc_lambda",
+        "free_light_chain_ratio": "flc_ratio",
+        "hemoglobin_g_dl": "hemoglobin",
+        "calcium_mg_dl": "calcium",
+        "creatinine_mg_dl": "creatinine",
+        "albumin_g_dl": "albumin",
+        "beta2_microglobulin_mg_l": "beta2_microglobulin",
+        "ldh_u_l": "ldh",
+    }
 
     def get_bounds(self, column: str) -> Optional[Tuple[float, float]]:
-        """Get bounds for given column."""
-        attr = f"{column.lower()}_bounds"
-        return getattr(self, attr, None)
+        """Get winsorization bounds for a lab column, or None to skip."""
+        prefix = self._COL_TO_ATTR.get(column.lower())
+        if prefix is None:
+            return None
+        return getattr(self, f"{prefix}_bounds", None)
 
 
 @dataclass
@@ -69,14 +94,26 @@ class CleansingState:
     missingness_patterns: Dict[str, float]
 
     def save(self, path: str) -> None:
-        """Save frozen parameters (implementation deferred to production system)."""
-        logger.info(f"[PRODUCTION] Would save CleansingState v{self.version} to {path}")
+        """Save frozen preprocessing state to disk via pickle."""
+        state_dict = {
+            "version": self.version,
+            "imputation_models": self.imputation_models,
+            "scaler": self.scaler,
+            "column_means": self.column_means,
+            "column_stds": self.column_stds,
+            "missingness_patterns": self.missingness_patterns,
+        }
+        with open(path, "wb") as f:
+            pickle.dump(state_dict, f)
+        logger.info(f"Saved CleansingState v{self.version} to {path}")
 
     @classmethod
     def load(cls, path: str) -> "CleansingState":
-        """Load frozen parameters (implementation deferred to production system)."""
-        logger.info(f"[PRODUCTION] Would load CleansingState from {path}")
-        raise NotImplementedError("Production checkpoint loading deferred")
+        """Load frozen preprocessing state from disk."""
+        with open(path, "rb") as f:
+            state_dict = pickle.load(f)
+        logger.info(f"Loaded CleansingState v{state_dict['version']} from {path}")
+        return cls(**state_dict)
 
 
 class DataCleaner:

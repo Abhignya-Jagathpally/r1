@@ -214,11 +214,20 @@ class BaselineEvaluator:
         bootstrap_ci: bool = False,
     ) -> Dict[float, Union[float, Tuple[float, float, float]]]:
         """
-        Compute time-dependent AUROC at multiple horizons.
+        Compute naive time-dependent AUROC at multiple horizons.
+
+        NOTE: This is a simplified time-dependent AUROC that excludes patients
+        censored before the horizon. It does NOT use inverse-probability-of-censoring
+        weighting (IPCW). For proper censoring-adjusted metrics, use:
+          - sksurv.metrics.cumulative_dynamic_auc (Uno's time-dependent AUROC)
+          - sksurv.metrics.integrated_brier_score
+        Results from this method should be labeled as "naive time-dependent AUROC"
+        in any publication.
 
         This evaluates discrimination at specific time points:
         - At time t, compares events occurring by t vs. no event by t
-        - Handles censoring appropriately
+        - Excludes censored patients before the horizon (information loss)
+        - Does not use IPCW weighting
 
         Args:
             times: Follow-up times (months)
@@ -228,7 +237,7 @@ class BaselineEvaluator:
             bootstrap_ci: Whether to compute bootstrap CI
 
         Returns:
-            Dictionary mapping horizon -> AUROC (and CI if requested)
+            Dictionary mapping horizon -> naive AUROC (and CI if requested)
         """
         results = {}
 
@@ -268,71 +277,112 @@ class BaselineEvaluator:
         events: Optional[np.ndarray] = None,
         time_horizons: Optional[List[float]] = None,
         model_name: str = "Model",
+        task_type: str = "snapshot_classification",
     ) -> Dict[str, Union[float, Dict]]:
         """
-        Comprehensive model evaluation.
+        Comprehensive model evaluation with explicit task type separation.
+
+        task_type="snapshot_classification":
+            Reports binary AUROC, Brier score, and ECE. These are appropriate
+            for models that produce binary class probabilities at a fixed horizon.
+            C-index is NOT reported (it is a survival metric).
+
+        task_type="survival":
+            Reports C-index (appropriate for survival ranking).
+            Reports naive time-dependent AUROC using horizon-specific binary labels.
+            Does NOT report binary AUROC unless horizon-specific labels are
+            explicitly constructed.
+            Time-dependent AUROC uses horizon-specific binary labels. This is an
+            approximation -- proper IPCW-weighted metrics (Uno's C, IBS) require
+            the sksurv or pycox packages.
 
         Args:
-            y_true: Binary labels for 3-month progression
-            y_pred: Predicted probabilities
-            times: Follow-up times (optional, for C-index)
-            events: Event indicators (optional, for C-index)
+            y_true: Binary labels (snapshot) or event indicators (survival)
+            y_pred: Predicted probabilities (snapshot) or risk scores (survival)
+            times: Follow-up times (optional, for survival metrics)
+            events: Event indicators (optional, for survival metrics)
             time_horizons: Time horizons for time-dependent AUROC (optional)
             model_name: Model name for logging
+            task_type: "snapshot_classification" or "survival"
 
         Returns:
             Dictionary with evaluation metrics
         """
-        logger.info(f"\nEvaluating {model_name}...")
+        if task_type not in ("snapshot_classification", "survival"):
+            raise ValueError(
+                f"task_type must be 'snapshot_classification' or 'survival', got '{task_type}'"
+            )
+
+        logger.info(f"\nEvaluating {model_name} (task_type={task_type})...")
 
         results = {
             "model_name": model_name,
+            "task_type": task_type,
         }
 
-        # Basic metrics
-        auroc, auroc_lo, auroc_hi = self.auroc_score(y_true, y_pred, bootstrap_ci=True)
-        results["auroc"] = auroc
-        results["auroc_ci_lower"] = auroc_lo
-        results["auroc_ci_upper"] = auroc_hi
+        if task_type == "snapshot_classification":
+            # ── Snapshot classification: binary event prediction at fixed horizon ──
+            logger.info("  Task: snapshot classification at fixed horizon")
 
-        brier, brier_lo, brier_hi = self.brier_score(y_true, y_pred, bootstrap_ci=True)
-        results["brier"] = brier
-        results["brier_ci_lower"] = brier_lo
-        results["brier_ci_upper"] = brier_hi
+            # Binary AUROC (appropriate for snapshot classification)
+            auroc, auroc_lo, auroc_hi = self.auroc_score(y_true, y_pred, bootstrap_ci=True)
+            results["auroc"] = auroc
+            results["auroc_ci_lower"] = auroc_lo
+            results["auroc_ci_upper"] = auroc_hi
+            logger.info(f"  AUROC: {auroc:.4f} [{auroc_lo:.4f}, {auroc_hi:.4f}]")
 
-        logger.info(f"  AUROC: {auroc:.4f} [{auroc_lo:.4f}, {auroc_hi:.4f}]")
-        logger.info(f"  Brier: {brier:.4f} [{brier_lo:.4f}, {brier_hi:.4f}]")
+            # Brier score (appropriate for snapshot classification)
+            brier, brier_lo, brier_hi = self.brier_score(y_true, y_pred, bootstrap_ci=True)
+            results["brier"] = brier
+            results["brier_ci_lower"] = brier_lo
+            results["brier_ci_upper"] = brier_hi
+            logger.info(f"  Brier: {brier:.4f} [{brier_lo:.4f}, {brier_hi:.4f}]")
 
-        # Calibration metrics
-        cal_metrics = self.calibration_metrics(y_true, y_pred)
-        results["calibration_ece"] = cal_metrics["expected_calibration_error"]
-        results["calibration_mce"] = cal_metrics["max_calibration_error"]
-        logger.info(f"  ECE: {cal_metrics['expected_calibration_error']:.4f}")
-        logger.info(f"  MCE: {cal_metrics['max_calibration_error']:.4f}")
+            # Calibration metrics (appropriate for snapshot classification)
+            cal_metrics = self.calibration_metrics(y_true, y_pred)
+            results["calibration_ece"] = cal_metrics["expected_calibration_error"]
+            results["calibration_mce"] = cal_metrics["max_calibration_error"]
+            logger.info(f"  ECE: {cal_metrics['expected_calibration_error']:.4f}")
+            logger.info(f"  MCE: {cal_metrics['max_calibration_error']:.4f}")
 
-        # C-index if survival data available
-        if times is not None and events is not None:
-            c_idx, c_lo, c_hi = self.concordance_index(times, events, y_pred, bootstrap_ci=True)
-            if not np.isnan(c_idx):
-                results["c_index"] = c_idx
-                results["c_index_ci_lower"] = c_lo
-                results["c_index_ci_upper"] = c_hi
-                logger.info(f"  C-index: {c_idx:.4f} [{c_lo:.4f}, {c_hi:.4f}]")
+            # NOTE: C-index is NOT reported for snapshot classification.
+            # It is a survival-specific metric and using binary class probabilities
+            # as risk scores for concordance is methodologically incorrect.
 
-        # Time-dependent AUROC
-        if time_horizons is not None and times is not None and events is not None:
-            td_auroc = self.time_dependent_auroc(
-                times,
-                events,
-                y_pred,
-                time_horizons,
-                bootstrap_ci=False,
-            )
-            results["time_dependent_auroc"] = td_auroc
-            logger.info("  Time-dependent AUROC:")
-            for horizon, auroc_val in td_auroc.items():
-                if not np.isnan(auroc_val):
-                    logger.info(f"    {horizon} months: {auroc_val:.4f}")
+        elif task_type == "survival":
+            # ── Survival prediction: time-to-event with censoring ──
+            logger.info("  Task: survival prediction (time-to-event with censoring)")
+
+            # C-index (appropriate for survival)
+            if times is not None and events is not None:
+                c_idx, c_lo, c_hi = self.concordance_index(
+                    times, events, y_pred, bootstrap_ci=True
+                )
+                if not np.isnan(c_idx):
+                    results["c_index"] = c_idx
+                    results["c_index_ci_lower"] = c_lo
+                    results["c_index_ci_upper"] = c_hi
+                    logger.info(f"  C-index: {c_idx:.4f} [{c_lo:.4f}, {c_hi:.4f}]")
+            else:
+                logger.warning("  C-index requires times and events; skipping.")
+
+            # Naive time-dependent AUROC (approximate — no IPCW weighting)
+            if time_horizons is not None and times is not None and events is not None:
+                td_auroc = self.time_dependent_auroc(
+                    times,
+                    events,
+                    y_pred,
+                    time_horizons,
+                    bootstrap_ci=False,
+                )
+                results["time_dependent_auroc"] = td_auroc
+                logger.info("  Naive time-dependent AUROC (no IPCW weighting):")
+                for horizon, auroc_val in td_auroc.items():
+                    if not np.isnan(auroc_val):
+                        logger.info(f"    {horizon} months: {auroc_val:.4f}")
+
+            # NOTE: Binary AUROC is NOT reported for survival models unless
+            # horizon-specific labels are explicitly constructed.
 
         return results
 
@@ -351,10 +401,24 @@ class BaselineEvaluator:
             target_auroc_ci: Benchmark CI width
 
         Returns:
-            DataFrame with comparison results
+            DataFrame with comparison results (includes comparison_caveat column)
         """
         rows = []
         benchmark = {"AUROC": target_auroc, "CI": target_auroc_ci}
+
+        # Determine evaluation protocol description from model results
+        task_types = set()
+        for results in model_results.values():
+            task_types.add(results.get("task_type", "unknown"))
+        task_desc = "/".join(sorted(task_types))
+
+        comparison_caveat = (
+            "CAVEAT: Benchmark comparison is informational only. The npj Digital Medicine 2025 "
+            "benchmark used full longitudinal lab data with proper IPCW-weighted metrics. "
+            f"Results here use [{task_desc}] evaluation on pipeline data. "
+            "Direct comparison is valid ONLY when using the same data source, feature set, "
+            "evaluation protocol, and time horizon."
+        )
 
         for model_name, results in model_results.items():
             auroc = results.get("auroc", np.nan)
@@ -363,6 +427,7 @@ class BaselineEvaluator:
             brier = results.get("brier", np.nan)
             ece = results.get("calibration_ece", np.nan)
             c_idx = results.get("c_index", np.nan)
+            task_type = results.get("task_type", "unknown")
 
             # Compute CI width
             ci_width = auroc_ci_upper - auroc_ci_lower if not np.isnan(auroc_ci_lower) else np.nan
@@ -376,12 +441,14 @@ class BaselineEvaluator:
 
             rows.append({
                 "Model": model_name,
+                "Task_Type": task_type,
                 "AUROC": f"{auroc:.4f}" if not np.isnan(auroc) else "N/A",
                 "AUROC_CI": f"[{auroc_ci_lower:.4f}, {auroc_ci_upper:.4f}]" if not np.isnan(auroc_ci_lower) else "N/A",
                 "Brier": f"{brier:.4f}" if not np.isnan(brier) else "N/A",
                 "ECE": f"{ece:.4f}" if not np.isnan(ece) else "N/A",
                 "C-Index": f"{c_idx:.4f}" if not np.isnan(c_idx) else "N/A",
                 "Meets_Benchmark": meets_benchmark,
+                "comparison_caveat": comparison_caveat,
             })
 
         df = pd.DataFrame(rows)
@@ -390,6 +457,8 @@ class BaselineEvaluator:
         logger.info("=" * 120)
         logger.info(f"Benchmark AUROC: {benchmark['AUROC']:.4f} ± {benchmark['CI']:.4f}\n")
         logger.info(df.to_string(index=False))
+        logger.info("")
+        logger.info(comparison_caveat)
         logger.info("=" * 120 + "\n")
 
         return df

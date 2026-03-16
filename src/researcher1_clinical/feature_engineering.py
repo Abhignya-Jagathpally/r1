@@ -252,40 +252,70 @@ class FeatureEngineer:
 
     def assess_slim_crab_criteria(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Assess SLiM-CRAB myeloma defining criteria.
+        Assess SLiM-CRAB myeloma-defining event criteria per IMWG 2014.
 
-        Returns binary indicators for each criterion:
-        - Calcium >= 11 mg/dL
-        - Hemoglobin < 10 g/dL
-        - Creatinine-based renal dysfunction (proxy: >= 2 mg/dL)
-        - Free light chain ratio >= 100
+        Reference: Rajkumar SV et al., Lancet Oncol 2014;15:e538-e548.
+
+        CRAB criteria (end-organ damage):
+          C: Calcium > 11 mg/dL (hypercalcemia)
+          R: Renal insufficiency — creatinine clearance < 40 mL/min OR
+             serum creatinine > 2 mg/dL (creatinine used as proxy here)
+          A: Anemia — hemoglobin < 10 g/dL (or >2 g/dL below lower limit of normal)
+          B: Bone disease — one or more lytic lesions (not available from labs)
+
+        SLiM criteria (biomarkers of near-inevitable progression to end-organ damage):
+          S: Clonal bone marrow plasma cells >= 60% (not available from blood work)
+          Li: Involved/uninvolved serum FLC ratio >= 100 (with involved FLC >= 100 mg/L)
+          M: > 1 focal lesion (>= 5 mm) on MRI (not available from blood work)
 
         Args:
             df: DataFrame with lab values
 
         Returns:
-            DataFrame with slim_crab_* binary columns
+            DataFrame with crab_*, slim_*, and myeloma_defining_event_any columns
         """
         criteria = pd.DataFrame(index=df.index)
 
+        # --- CRAB criteria ---
         if "calcium_mg_dl" in df.columns:
-            criteria["slim_crab_hypercalcemia"] = (df["calcium_mg_dl"] >= 11).astype(int)
-
-        if "hemoglobin_g_dl" in df.columns:
-            criteria["slim_crab_anemia"] = (df["hemoglobin_g_dl"] < 10).astype(int)
+            criteria["crab_calcium"] = (df["calcium_mg_dl"] > 11).astype(int)
 
         if "creatinine_mg_dl" in df.columns:
-            criteria["slim_crab_renal"] = (df["creatinine_mg_dl"] >= 2).astype(int)
+            # Proxy for renal criterion: serum creatinine > 2 mg/dL
+            # Full IMWG definition also includes creatinine clearance < 40 mL/min
+            criteria["crab_renal"] = (df["creatinine_mg_dl"] > 2).astype(int)
 
+        if "hemoglobin_g_dl" in df.columns:
+            criteria["crab_anemia"] = (df["hemoglobin_g_dl"] < 10).astype(int)
+
+        # crab_bone: not available from lab data (requires imaging)
+
+        # --- SLiM criteria ---
         if "free_light_chain_ratio" in df.columns:
-            criteria["slim_crab_light_chain"] = (df["free_light_chain_ratio"] >= 100).astype(int)
+            # Li criterion: involved/uninvolved FLC ratio >= 100
+            # Using absolute FLC ratio as proxy for involved/uninvolved ratio
+            criteria["slim_flc_ratio"] = (df["free_light_chain_ratio"] >= 100).astype(int)
 
-        # Overall: criteria met if >=1 present
-        criteria["slim_crab_any_criterion"] = (
-            criteria[[col for col in criteria.columns if col.startswith("slim_crab_")]].sum(axis=1) > 0
-        ).astype(int)
+        # S criterion: bone marrow clonal plasma cells >= 60% (not available from blood work)
+        criteria["slim_plasma_cells"] = np.nan
 
-        logger.info("Assessed SLiM-CRAB criteria")
+        # M criterion: > 1 focal lesion on MRI (not available from blood work)
+        criteria["slim_mri_lesions"] = np.nan
+
+        # --- Combined myeloma-defining event flag ---
+        assessable_cols = [
+            col for col in criteria.columns
+            if (col.startswith("crab_") or col.startswith("slim_"))
+            and criteria[col].notna().any()
+        ]
+        if assessable_cols:
+            criteria["myeloma_defining_event_any"] = (
+                criteria[assessable_cols].sum(axis=1) > 0
+            ).astype(int)
+        else:
+            criteria["myeloma_defining_event_any"] = np.nan
+
+        logger.info("Assessed SLiM-CRAB criteria (IMWG 2014)")
         return criteria
 
     def aggregate_trajectory_windows(

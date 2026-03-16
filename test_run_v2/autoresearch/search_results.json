@@ -1,0 +1,354 @@
+{
+  "config": {
+    "model_type": "xgboost",
+    "learning_rate": [
+      0.0001,
+      0.1
+    ],
+    "batch_size": [
+      16,
+      256
+    ],
+    "n_epochs": [
+      10,
+      100
+    ],
+    "l2_regularization": [
+      1e-06,
+      0.01
+    ],
+    "dropout_rate": [
+      0.0,
+      0.5
+    ],
+    "preprocessing_version": "v1.0",
+    "preprocessing_config": {
+      "scaling": "standard",
+      "imputation": "mean",
+      "feature_selection": "none"
+    },
+    "search_strategy": "bayesian",
+    "n_trials": 20,
+    "max_wall_clock_hours": 0.5
+  },
+  "trials": [
+    {
+      "trial_id": 0,
+      "params": {
+        "learning_rate": 0.0013292918943162175,
+        "batch_size": 223,
+        "n_epochs": 76,
+        "l2_regularization": 0.0002481040974867811,
+        "dropout_rate": 0.07800932022121826
+      },
+      "metric_value": 0.8426773455377575,
+      "timestamp": "2026-03-15T21:20:23.913870",
+      "duration_seconds": 14.106553792953491,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 1,
+      "params": {
+        "learning_rate": 0.00029375384576328325,
+        "batch_size": 18,
+        "n_epochs": 88,
+        "l2_regularization": 0.00025378155082656634,
+        "dropout_rate": 0.35403628889802274
+      },
+      "metric_value": 0.8385910428244524,
+      "timestamp": "2026-03-15T21:20:32.054533",
+      "duration_seconds": 8.13936161994934,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 2,
+      "params": {
+        "learning_rate": 0.00011527987128232407,
+        "batch_size": 236,
+        "n_epochs": 85,
+        "l2_regularization": 7.068974950624607e-06,
+        "dropout_rate": 0.09091248360355031
+      },
+      "metric_value": 0.8440666884602811,
+      "timestamp": "2026-03-15T21:20:47.565803",
+      "duration_seconds": 15.510018587112427,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 3,
+      "params": {
+        "learning_rate": 0.0003549878832196505,
+        "batch_size": 36,
+        "n_epochs": 57,
+        "l2_regularization": 5.34293726127978e-05,
+        "dropout_rate": 0.14561457009902096
+      },
+      "metric_value": 0.8443935926773455,
+      "timestamp": "2026-03-15T21:20:50.405191",
+      "duration_seconds": 2.8381569385528564,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 4,
+      "params": {
+        "learning_rate": 0.006847920095574782,
+        "batch_size": 23,
+        "n_epochs": 36,
+        "l2_regularization": 2.9204338471814107e-05,
+        "dropout_rate": 0.22803499210851796
+      },
+      "metric_value": 0.8364661654135338,
+      "timestamp": "2026-03-15T21:20:54.986360",
+      "duration_seconds": 4.580149173736572,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 5,
+      "params": {
+        "learning_rate": 0.0226739865237804,
+        "batch_size": 27,
+        "n_epochs": 56,
+        "l2_regularization": 0.00023423849847112912,
+        "dropout_rate": 0.023225206359998862
+      },
+      "metric_value": 0.8886073880353057,
+      "timestamp": "2026-03-15T21:21:02.513897",
+      "duration_seconds": 7.526476621627808,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 6,
+      "params": {
+        "learning_rate": 0.006647135865318031,
+        "batch_size": 25,
+        "n_epochs": 15,
+        "l2_regularization": 0.006245139574743076,
+        "dropout_rate": 0.4828160165372797
+      },
+      "metric_value": 0.842350441320693,
+      "timestamp": "2026-03-15T21:21:02.744997",
+      "duration_seconds": 0.23002910614013672,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 7,
+      "params": {
+        "learning_rate": 0.026619018884890575,
+        "batch_size": 36,
+        "n_epochs": 18,
+        "l2_regularization": 0.0005456725485601478,
+        "dropout_rate": 0.22007624686980065
+      },
+      "metric_value": 0.8417783589408303,
+      "timestamp": "2026-03-15T21:21:03.023082",
+      "duration_seconds": 0.2772078514099121,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 8,
+      "params": {
+        "learning_rate": 0.00023233503515390126,
+        "batch_size": 62,
+        "n_epochs": 13,
+        "l2_regularization": 0.004337920697490943,
+        "dropout_rate": 0.12938999080000846
+      },
+      "metric_value": 0.8435763321346845,
+      "timestamp": "2026-03-15T21:21:03.414786",
+      "duration_seconds": 0.39086437225341797,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 9,
+      "params": {
+        "learning_rate": 0.009717775305059635,
+        "batch_size": 37,
+        "n_epochs": 57,
+        "l2_regularization": 0.00015375920235481777,
+        "dropout_rate": 0.09242722776276352
+      },
+      "metric_value": 0.8528113762667539,
+      "timestamp": "2026-03-15T21:21:16.363807",
+      "duration_seconds": 12.948180198669434,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 10,
+      "params": {
+        "learning_rate": 0.08400042944806597,
+        "batch_size": 110,
+        "n_epochs": 38,
+        "l2_regularization": 1.1799062523159305e-06,
+        "dropout_rate": 0.007256733440025795
+      },
+      "metric_value": 0.9303694017652829,
+      "timestamp": "2026-03-15T21:21:27.951171",
+      "duration_seconds": 11.586291551589966,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 11,
+      "params": {
+        "learning_rate": 0.06394249909433915,
+        "batch_size": 119,
+        "n_epochs": 39,
+        "l2_regularization": 2.1995825905536667e-06,
+        "dropout_rate": 0.0018633118857413426
+      },
+      "metric_value": 0.9194181104936253,
+      "timestamp": "2026-03-15T21:21:30.650467",
+      "duration_seconds": 2.698253631591797,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 12,
+      "params": {
+        "learning_rate": 0.0948747547007573,
+        "batch_size": 126,
+        "n_epochs": 36,
+        "l2_regularization": 1.3644721320730966e-06,
+        "dropout_rate": 0.008217713409360637
+      },
+      "metric_value": 0.9317587446878065,
+      "timestamp": "2026-03-15T21:21:39.558615",
+      "duration_seconds": 8.907110214233398,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 13,
+      "params": {
+        "learning_rate": 0.08125704815270873,
+        "batch_size": 113,
+        "n_epochs": 36,
+        "l2_regularization": 1.0405480109131076e-06,
+        "dropout_rate": 0.3229282203516206
+      },
+      "metric_value": 0.9252206603465185,
+      "timestamp": "2026-03-15T21:21:46.392195",
+      "duration_seconds": 6.832541227340698,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 14,
+      "params": {
+        "learning_rate": 0.032193221717026134,
+        "batch_size": 119,
+        "n_epochs": 27,
+        "l2_regularization": 6.486776397865599e-06,
+        "dropout_rate": 0.013657518479145207
+      },
+      "metric_value": 0.8793723439032363,
+      "timestamp": "2026-03-15T21:21:48.500863",
+      "duration_seconds": 2.107618570327759,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 15,
+      "params": {
+        "learning_rate": 0.0017321767217417167,
+        "batch_size": 75,
+        "n_epochs": 69,
+        "l2_regularization": 9.07818623043566e-06,
+        "dropout_rate": 0.15437157444164995
+      },
+      "metric_value": 0.8435763321346845,
+      "timestamp": "2026-03-15T21:21:52.043787",
+      "duration_seconds": 3.5419552326202393,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 16,
+      "params": {
+        "learning_rate": 0.09956055660659037,
+        "batch_size": 174,
+        "n_epochs": 43,
+        "l2_regularization": 1.2015725719511403e-06,
+        "dropout_rate": 0.4827692778655844
+      },
+      "metric_value": 0.9387871853546912,
+      "timestamp": "2026-03-15T21:22:01.785817",
+      "duration_seconds": 9.74094533920288,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 17,
+      "params": {
+        "learning_rate": 0.01969565030204256,
+        "batch_size": 169,
+        "n_epochs": 46,
+        "l2_regularization": 3.2467398954459588e-06,
+        "dropout_rate": 0.49800849468060676
+      },
+      "metric_value": 0.8792088917947042,
+      "timestamp": "2026-03-15T21:22:09.234647",
+      "duration_seconds": 7.447797060012817,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 18,
+      "params": {
+        "learning_rate": 0.04481186758568842,
+        "batch_size": 160,
+        "n_epochs": 47,
+        "l2_regularization": 2.019580359130434e-05,
+        "dropout_rate": 0.41023612659334596
+      },
+      "metric_value": 0.9086302713305001,
+      "timestamp": "2026-03-15T21:22:14.068343",
+      "duration_seconds": 4.83263087272644,
+      "status": "completed",
+      "error_message": null
+    },
+    {
+      "trial_id": 19,
+      "params": {
+        "learning_rate": 0.013969207290490395,
+        "batch_size": 70,
+        "n_epochs": 98,
+        "l2_regularization": 0.0009634835238008427,
+        "dropout_rate": 0.2919581713577305
+      },
+      "metric_value": 0.8910591696632887,
+      "timestamp": "2026-03-15T21:22:28.519114",
+      "duration_seconds": 14.44973349571228,
+      "status": "completed",
+      "error_message": null
+    }
+  ],
+  "best_trial": {
+    "trial_id": 16,
+    "params": {
+      "learning_rate": 0.09956055660659037,
+      "batch_size": 174,
+      "n_epochs": 43,
+      "l2_regularization": 1.2015725719511403e-06,
+      "dropout_rate": 0.4827692778655844
+    },
+    "metric_value": 0.9387871853546912,
+    "timestamp": "2026-03-15T21:22:01.785817",
+    "duration_seconds": 9.74094533920288,
+    "status": "completed",
+    "error_message": null
+  },
+  "best_metric": 0.9387871853546912,
+  "search_duration_seconds": 138.71477055549622,
+  "timestamp": "2026-03-15T21:20:09.805496"
+}

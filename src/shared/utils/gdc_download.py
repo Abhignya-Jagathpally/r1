@@ -1,9 +1,11 @@
 """
 Download real MMRF-COMMPASS clinical data from GDC (Genomic Data Commons).
 
-The GDC provides public access to MMRF-COMMPASS case-level clinical data
-without authentication. This module fetches it via the GDC REST API and
-converts it into the flat-file format expected by CoMMpassIngester.
+The GDC provides open access to MMRF-COMMPASS case-level METADATA
+(demographics, vital status, diagnosis dates) via the Cases API without
+authentication. Molecular data (WES, RNA-seq, copy number) requires dbGaP
+controlled access (phs000748). Lab values and longitudinal visit data are
+NOT available from GDC — they require MMRF Researcher Gateway access.
 """
 
 import json
@@ -120,7 +122,6 @@ def _cases_to_dataframe(cases: List[Dict]) -> pd.DataFrame:
     the format expected by CoMMpassIngester.
     """
     rows = []
-    rng = np.random.RandomState(42)  # For lab value simulation boundaries only
 
     for case in cases:
         patient_id = case.get("submitter_id", case.get("id", ""))
@@ -135,10 +136,28 @@ def _cases_to_dataframe(cases: List[Dict]) -> pd.DataFrame:
         age_at_dx = dx.get("age_at_diagnosis", None)
         iss_stage = dx.get("iss_stage", None)
 
-        # Derive survival endpoints from real GDC data
-        os_event = 1 if vital_status == "Dead" else 0
+        # Derive survival endpoints from real GDC data.
+        # Missing event status is preserved as NaN. Downstream models must
+        # handle or exclude these patients. Converting missing to non-event
+        # would bias survival estimates.
+        if vital_status == "Dead":
+            os_event = 1
+        elif vital_status == "Alive":
+            os_event = 0
+        else:
+            # Unknown/missing vital status — do NOT assume non-event
+            os_event = np.nan
+
         os_days = days_to_death if days_to_death else days_to_follow_up
-        pfs_event = 1 if days_to_recurrence else os_event
+
+        if days_to_recurrence:
+            pfs_event = 1
+        elif isinstance(os_event, float) and np.isnan(os_event):
+            # Vital status unknown and no recurrence data — PFS is unknown
+            pfs_event = np.nan
+        else:
+            pfs_event = os_event
+
         pfs_days = days_to_recurrence if days_to_recurrence else os_days
 
         # Parse ISS stage to numeric
@@ -163,8 +182,8 @@ def _cases_to_dataframe(cases: List[Dict]) -> pd.DataFrame:
             "os_days": os_days,
             "os_event": os_event,
             "time_to_progression_days": days_to_recurrence,
-            "ttp_event": 1 if days_to_recurrence else 0,
-            "relapse_event": 1 if days_to_recurrence else 0,
+            "ttp_event": 1 if days_to_recurrence else (np.nan if isinstance(os_event, float) and np.isnan(os_event) else 0),
+            "relapse_event": 1 if days_to_recurrence else (np.nan if isinstance(os_event, float) and np.isnan(os_event) else 0),
             # Treatment flags (from GDC we can infer limited treatment info)
             "treatment_line": 1,
             "prior_transplant": 0,
@@ -190,12 +209,17 @@ def _cases_to_dataframe(cases: List[Dict]) -> pd.DataFrame:
     for col in ["pfs_days", "os_days", "time_to_progression_days", "age_at_diagnosis"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
+    # Event columns: preserve NaN for unknown event status (do NOT fillna(0)).
+    # Missing event status must remain NaN so downstream survival models can
+    # handle or exclude these patients appropriately.
     for col in ["pfs_event", "os_event", "ttp_event", "relapse_event"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
     logger.info(
         f"Built clinical DataFrame: {len(df)} patients, "
-        f"{df['os_event'].sum()} deaths, {df['pfs_event'].sum()} progression events"
+        f"{int(df['os_event'].sum())} deaths, "
+        f"{int(df['pfs_event'].sum())} progression events, "
+        f"{int(df['os_event'].isna().sum())} unknown vital status"
     )
 
     return df
