@@ -1,3 +1,0 @@
-Model,AUROC,AUROC_CI,Brier,ECE,C-Index,Meets_Benchmark
-LogisticRegression,0.7582,"[0.6734, 0.8294]",0.1401,0.0899,0.6755,False
-XGBoost,0.7030,"[0.6209, 0.7798]",0.1491,0.0787,0.6568,False

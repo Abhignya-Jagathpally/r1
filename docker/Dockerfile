@@ -12,11 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY src/researcher4_evaluation/requirements.txt /tmp/requirements.txt
+COPY requirements.txt /tmp/requirements.txt
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
-    pip install --no-cache-dir dvc
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Copy application code
 COPY . /app
