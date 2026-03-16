@@ -1,0 +1,56 @@
+# Snakemake Configuration for Myeloma Clinical AI Pipeline
+
+# Input/Output Directories
+input_dir: "data/raw"
+output_dir: "results"
+
+# Data Processing Parameters
+min_followup_months: 6
+lab_imputation_method: "forward_fill"  # Options: forward_fill, linear, knn
+genomics_variant_caller: "bcftools"
+imaging_feature_extractor: "radiomics"  # Options: radiomics, deep_learning
+
+# Train/Validation/Test Split
+train_fraction: 0.70
+val_fraction: 0.15
+test_fraction: 0.15
+stratify_by: "risk_group"  # Options: risk_group, disease_stage, newly_diagnosed
+
+# Model Selection
+baseline_models:
+  - xgboost
+  - random_forest
+  - logistic_regression
+
+advanced_models:
+  - transformer_scope
+  - deepsurvival
+  - temporal_fusion_transformer
+
+# Hyperparameters
+random_seed: 42
+xgboost_params:
+  n_estimators: 100
+  max_depth: 6
+  learning_rate: 0.1
+
+random_forest_params:
+  n_estimators: 100
+  max_depth: 10
+
+# Computing Resources
+threads: 8
+memory_gb: 32
+gpu_available: false
+gpu_type: "nvidia_a40"
+
+# Output Formats
+export_formats:
+  - csv
+  - parquet
+  - h5
+
+# Logging and Reporting
+log_level: "INFO"
+generate_html_report: true
+generate_metrics_json: true

@@ -1,0 +1,118 @@
+# R1 Pipeline Configuration — Shared across all researchers
+project:
+  name: "r1-mm-digital-twin"
+  version: "0.1.0"
+  dataset: "CoMMpass (MMRF IA20+)"
+
+data:
+  raw_dir: "data/raw"
+  standardized_dir: "data/standardized"
+  analysis_ready_dir: "data/analysis_ready"
+  formats:
+    tabular: "parquet"  # Arrow-backed
+    single_cell: "anndata"  # .h5ad / Zarr
+    imaging: "ome-tiff"
+
+  compass_labs:
+    - serum_m_protein
+    - free_light_chains_kappa
+    - free_light_chains_lambda
+    - flc_ratio
+    - hemoglobin
+    - calcium
+    - creatinine
+    - albumin
+    - beta2_microglobulin
+    - ldh
+
+  clinical_features:
+    - treatment_line
+    - transplant_flag
+    - cytogenetics_fish
+    - iss_stage
+    - riss_stage
+    - crab_criteria
+    - slim_criteria
+
+  endpoints:
+    - progression_free_survival
+    - overall_survival
+    - time_to_progression
+    - relapse_indicator
+
+preprocessing:
+  winsorize_bounds: "clinician_reviewed"  # Not automated
+  imputation: "train_fold_only"
+  normalization: "train_fold_only"
+  missingness_mask: true
+  long_format: true  # one row per patient per timepoint
+
+  temporal_features:
+    slopes: true
+    rolling_means: [3, 6, 12]  # months
+    rolling_variance: [3, 6, 12]
+    time_since_last_treatment: true
+    crab_summary: true
+    slim_summary: true
+
+  trajectory_windows:
+    windows_months: [3, 6, 12]
+    aggregations:
+      - mean
+      - std
+      - delta  # first-to-last change
+      - max
+      - min
+
+splits:
+  strategy: "patient_level"
+  longitudinal: "time_aware"
+  n_folds: 5
+  test_fraction: 0.2
+  seed: 42
+
+modeling:
+  rule: "classical_first_then_foundation_then_fusion"
+  baselines:
+    - locf  # last observation carried forward
+    - moving_average
+    - cox_ph
+    - random_survival_forest
+    - xgboost_snapshot
+    - catboost_snapshot
+    - logistic_regression_short_horizon
+    - tabpfn_v2_snapshot
+  advanced:
+    - temporal_fusion_transformer
+    - deephit
+    - dynamic_survival_model
+  fusion:
+    - multimodal_late_fusion
+
+evaluation:
+  primary_metric: "auroc"
+  secondary_metrics:
+    - brier_score
+    - calibration_slope
+    - calibration_intercept
+    - concordance_index
+    - time_dependent_auroc
+  horizons_months: [3, 6, 12]
+  benchmark:
+    source: "npj Digital Medicine 2025"
+    auroc_3mo: 0.78
+    auroc_3mo_std: 0.02
+    external_auroc: 0.87
+
+tracking:
+  backend: "mlflow"  # or "wandb"
+  dvc_enabled: true
+  docker_reproducibility: true
+
+autoresearch:
+  pattern: "karpathy_autoresearch"
+  editable_surface: "training_config_only"
+  preprocessing_locked: true
+  search_budget_hours: 24
+  single_metric: "auroc"
+  full_experiment_logs: true

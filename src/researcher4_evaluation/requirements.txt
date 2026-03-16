@@ -1,0 +1,44 @@
+# Multiple Myeloma Digital Twin - Evaluation Framework
+# MLOps and evaluation expert requirements
+
+# Core ML & Data
+numpy>=1.23.0
+pandas>=1.5.0
+scikit-learn>=1.2.0
+
+# Time-series and survival analysis
+lifelines>=0.27.0
+
+# MLflow for experiment tracking
+mlflow>=2.0.0
+
+# Hyperparameter optimization
+optuna>=3.0.0
+
+# Deep learning (optional, for neural network models)
+tensorflow>=2.10.0
+torch>=2.0.0
+
+# Visualization
+matplotlib>=3.6.0
+seaborn>=0.12.0
+
+# Statistical testing
+scipy>=1.9.0
+
+# Configuration management
+pyyaml>=6.0
+
+# Distributed computing (optional)
+ray[tune]>=2.0.0
+
+# Utilities
+tqdm>=4.64.0
+python-dotenv>=0.20.0
+pytest>=7.2.0
+
+# Development
+black>=23.0.0
+flake8>=5.0.0
+mypy>=0.990
+isort>=5.11.0
