@@ -1,0 +1,18 @@
+
+Autoresearch Summary
+====================
+Search Duration: 0.02 hours
+Total Trials: 20
+Best AUROC: 0.9388
+
+Best Trial Parameters:
+  learning_rate: 0.09956055660659037
+  batch_size: 174
+  n_epochs: 43
+  l2_regularization: 1.2015725719511403e-06
+  dropout_rate: 0.4827692778655844
+
+Trial Statistics:
+  Completed: 20
+  Failed: 0
+  Pruned: 0

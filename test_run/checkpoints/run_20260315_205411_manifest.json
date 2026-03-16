@@ -1,0 +1,358 @@
+{
+  "run_id": "run_20260315_205411",
+  "pipeline_version": "0.1.0",
+  "started_at": "2026-03-15T20:54:11.673061",
+  "completed_at": "2026-03-15T20:54:43.954768",
+  "status": "failed",
+  "git_sha": "ab6943155005ee01f708ac1faf31bd9305d4019c",
+  "git_branch": "main",
+  "git_dirty": true,
+  "python_version": "3.12.3",
+  "platform_info": "Linux-6.8.0-57-generic-x86_64-with-glibc2.39",
+  "config_hash": "f82740b0a15976aa",
+  "seed": 42,
+  "stages": [
+    {
+      "stage_name": "ingest",
+      "stage_index": 0,
+      "status": "completed",
+      "started_at": "2026-03-15T20:54:12.439370",
+      "completed_at": "2026-03-15T20:54:12.474805",
+      "duration_seconds": 0.04,
+      "input_hash": "",
+      "output_hash": "4a886a3d446ea5f0",
+      "input_shape": null,
+      "output_shape": [
+        995,
+        39
+      ],
+      "n_patients": 995,
+      "n_features": 39,
+      "parameters": {},
+      "metrics": {
+        "n_rows": 995,
+        "n_patients": 995,
+        "columns": [
+          "_source",
+          "age_at_diagnosis",
+          "albumin_g_dl",
+          "allogeneic_transplant",
+          "autologous_transplant",
+          "beta2_microglobulin_mg_l",
+          "calcium_mg_dl",
+          "creatinine_mg_dl",
+          "cytogenetics_del13",
+          "cytogenetics_t_14_16",
+          "cytogenetics_t_14_20",
+          "cytogenetics_t_4_14",
+          "fish_del13",
+          "fish_del17p",
+          "fish_gain1q",
+          "fish_t_14_16",
+          "fish_t_4_14",
+          "free_light_chain_kappa_mg_l",
+          "free_light_chain_lambda_mg_l",
+          "free_light_chain_ratio",
+          "gender",
+          "hemoglobin_g_dl",
+          "iss_stage",
+          "ldh_u_l",
+          "os_days",
+          "os_event",
+          "patient_id",
+          "pfs_days",
+          "pfs_event",
+          "prior_transplant",
+          "r_iss_stage",
+          "race",
+          "relapse_event",
+          "serum_m_protein_g_dl",
+          "time_to_progression_days",
+          "timepoint",
+          "treatment_line",
+          "ttp_event",
+          "visit_id"
+        ]
+      },
+      "artifacts": [
+        "test_run/01_raw_ingested.parquet"
+      ],
+      "error_message": ""
+    },
+    {
+      "stage_name": "cleanse",
+      "stage_index": 1,
+      "status": "completed",
+      "started_at": "2026-03-15T20:54:12.475245",
+      "completed_at": "2026-03-15T20:54:12.534185",
+      "duration_seconds": 0.06,
+      "input_hash": "4a886a3d446ea5f0",
+      "output_hash": "24d7209d2aa26303",
+      "input_shape": [
+        995,
+        39
+      ],
+      "output_shape": [
+        995,
+        38
+      ],
+      "n_patients": 995,
+      "n_features": 38,
+      "parameters": {
+        "imputation": "mice",
+        "mode": "train",
+        "preprocessing_version": "0.1.0"
+      },
+      "metrics": {
+        "n_rows_after": 995,
+        "missingness_pct": 50.1279122887163
+      },
+      "artifacts": [
+        "test_run/preprocessing_state.json",
+        "test_run/02_cleaned.parquet"
+      ],
+      "error_message": ""
+    },
+    {
+      "stage_name": "engineer",
+      "stage_index": 2,
+      "status": "completed",
+      "started_at": "2026-03-15T20:54:12.534658",
+      "completed_at": "2026-03-15T20:54:21.165604",
+      "duration_seconds": 8.63,
+      "input_hash": "24d7209d2aa26303",
+      "output_hash": "8446e25a0dee74b6",
+      "input_shape": [
+        995,
+        38
+      ],
+      "output_shape": [
+        995,
+        74
+      ],
+      "n_patients": 0,
+      "n_features": 74,
+      "parameters": {},
+      "metrics": {
+        "new_features_created": 36,
+        "total_features": 74
+      },
+      "artifacts": [
+        "test_run/03_engineered.parquet"
+      ],
+      "error_message": ""
+    },
+    {
+      "stage_name": "split",
+      "stage_index": 3,
+      "status": "completed",
+      "started_at": "2026-03-15T20:54:21.166362",
+      "completed_at": "2026-03-15T20:54:21.326391",
+      "duration_seconds": 0.16,
+      "input_hash": "",
+      "output_hash": "",
+      "input_shape": [
+        995,
+        74
+      ],
+      "output_shape": [
+        796,
+        199,
+        199
+      ],
+      "n_patients": 0,
+      "n_features": 0,
+      "parameters": {
+        "strategy": "stratified_group_kfold",
+        "test_fraction": 0.2,
+        "val_fraction": 0.15,
+        "n_folds": 5,
+        "seed": 42
+      },
+      "metrics": {
+        "train_rows": 796,
+        "val_rows": 199,
+        "test_rows": 199,
+        "train_patients": 796,
+        "val_patients": 199,
+        "test_patients": 199,
+        "patient_leakage_detected": false,
+        "leaked_patient_count": 0
+      },
+      "artifacts": [
+        "test_run/04_train.parquet",
+        "test_run/04_val.parquet",
+        "test_run/04_test.parquet"
+      ],
+      "error_message": ""
+    },
+    {
+      "stage_name": "baselines",
+      "stage_index": 4,
+      "status": "completed",
+      "started_at": "2026-03-15T20:54:21.474097",
+      "completed_at": "2026-03-15T20:54:41.952044",
+      "duration_seconds": 20.48,
+      "input_hash": "",
+      "output_hash": "",
+      "input_shape": null,
+      "output_shape": [
+        2
+      ],
+      "n_patients": 0,
+      "n_features": 0,
+      "parameters": {
+        "models": [
+          "LogisticRegression",
+          "XGBoost",
+          "RandomSurvivalForest"
+        ],
+        "cv_splits": 5,
+        "seed": 42
+      },
+      "metrics": {
+        "models_trained": [
+          "LogisticRegression",
+          "XGBoost"
+        ],
+        "models_failed": [
+          "RandomSurvivalForest"
+        ],
+        "results": {
+          "LogisticRegression": {
+            "model_name": "LogisticRegression",
+            "fit_status": "success",
+            "val_auroc": 0.6042824452435437,
+            "val_brier": 0.1559876597242118
+          },
+          "XGBoost": {
+            "model_name": "XGBoost",
+            "fit_status": "success",
+            "val_auroc": 0.8570611310885909,
+            "val_brier": 0.128620474448911
+          },
+          "RandomSurvivalForest": {
+            "error": "observed time contains values smaller zero"
+          }
+        }
+      },
+      "artifacts": [
+        "test_run/05_baseline_results.json"
+      ],
+      "error_message": ""
+    },
+    {
+      "stage_name": "advanced",
+      "stage_index": 5,
+      "status": "completed",
+      "started_at": "2026-03-15T20:54:41.953617",
+      "completed_at": "2026-03-15T20:54:41.954259",
+      "duration_seconds": 0.0,
+      "input_hash": "",
+      "output_hash": "",
+      "input_shape": null,
+      "output_shape": [
+        3
+      ],
+      "n_patients": 0,
+      "n_features": 0,
+      "parameters": {
+        "models": [
+          "deephit",
+          "temporal_fusion_transformer",
+          "multimodal_fusion"
+        ]
+      },
+      "metrics": {
+        "models_attempted": [
+          "deephit",
+          "temporal_fusion_transformer",
+          "multimodal_fusion"
+        ],
+        "results": {
+          "deephit": {
+            "status": "skipped",
+            "reason": "torch not installed"
+          },
+          "temporal_fusion_transformer": {
+            "status": "skipped",
+            "reason": "torch not installed"
+          },
+          "multimodal_fusion": {
+            "status": "skipped",
+            "reason": "torch not installed"
+          }
+        }
+      },
+      "artifacts": [
+        "test_run/06_advanced_results.json"
+      ],
+      "error_message": ""
+    },
+    {
+      "stage_name": "evaluate",
+      "stage_index": 6,
+      "status": "completed",
+      "started_at": "2026-03-15T20:54:41.954938",
+      "completed_at": "2026-03-15T20:54:43.937997",
+      "duration_seconds": 1.98,
+      "input_hash": "",
+      "output_hash": "",
+      "input_shape": null,
+      "output_shape": [
+        2
+      ],
+      "n_patients": 0,
+      "n_features": 0,
+      "parameters": {
+        "horizons_months": [
+          3,
+          6,
+          12
+        ],
+        "benchmark_auroc": 0.78
+      },
+      "metrics": {
+        "models_evaluated": [
+          "LogisticRegression",
+          "XGBoost"
+        ],
+        "summary": {
+          "LogisticRegression": {
+            "model_name": "LogisticRegression",
+            "auroc": 0.7581730769230769,
+            "auroc_ci_lower": 0.6733784578664096,
+            "auroc_ci_upper": 0.8293635893825122,
+            "brier": 0.14010666759900456,
+            "brier_ci_lower": 0.1158482046348589,
+            "brier_ci_upper": 0.16732996485905174,
+            "calibration_ece": 0.08989303298943568,
+            "calibration_mce": 0.3025423111399898,
+            "c_index": 0.675529788084766,
+            "c_index_ci_lower": 0.583233405836458,
+            "c_index_ci_upper": 0.7549250895505261
+          },
+          "XGBoost": {
+            "model_name": "XGBoost",
+            "auroc": 0.7029647435897436,
+            "auroc_ci_lower": 0.620917284359425,
+            "auroc_ci_upper": 0.7798201774001193,
+            "brier": 0.1491167405887854,
+            "brier_ci_lower": 0.12114305432847429,
+            "brier_ci_upper": 0.18206317128220537,
+            "calibration_ece": 0.07865566481363209,
+            "calibration_mce": 0.16315363509102931,
+            "c_index": 0.6568372650939625,
+            "c_index_ci_lower": 0.5697672503797713,
+            "c_index_ci_upper": 0.7317575243913452
+          }
+        }
+      },
+      "artifacts": [
+        "test_run/07_benchmark_comparison.csv",
+        "test_run/07_evaluation_results.json"
+      ],
+      "error_message": ""
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "models_attempted": [
+    "deephit",
+    "temporal_fusion_transformer",
+    "multimodal_fusion"
+  ],
+  "results": {
+    "deephit": {
+      "status": "skipped",
+      "reason": "torch not installed"
+    },
+    "temporal_fusion_transformer": {
+      "status": "skipped",
+      "reason": "torch not installed"
+    },
+    "multimodal_fusion": {
+      "status": "skipped",
+      "reason": "torch not installed"
+    }
+  }
+}
